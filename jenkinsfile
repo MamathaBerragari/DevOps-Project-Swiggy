@@ -1,73 +1,74 @@
-pipeline{
+pipeline {
     agent any
-    tools{
-        jdk 'jdk17'
+
+    tools {
         nodejs 'node23'
     }
+
     environment {
-        SCANNER_HOME=tool 'sonar-scanner'
+        DOCKER_IMAGE = "mamathaberragari/swiggy-app"
+        TAG = "latest"
     }
+
     stages {
-        stage('clean workspace'){
-            steps{
+
+        stage('Clean Workspace') {
+            steps {
                 cleanWs()
             }
         }
-        stage('Checkout from Git'){
-            steps{
-                git 'https://github.com/KastroVKiran/DevOps-Project-Swiggy.git'
+
+        stage('Checkout Code') {
+            steps {
+                git 'https://github.com/MamathaBerragari/DevOps-Project-Swiggy.git'
             }
         }
-        stage("Sonarqube Analysis "){
-            steps{
-                withSonarQubeEnv('sonar-server') {
-                    sh ''' $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=Swiggy \
-                    -Dsonar.projectKey=Swiggy '''
-                }
-            }
-        }
-        stage("quality gate"){
-           steps {
-                script {
-                    waitForQualityGate abortPipeline: false, credentialsId: 'Sonar-token' 
-                }
-            } 
-        }
+
         stage('Install Dependencies') {
             steps {
-                sh "npm install"
+                sh 'npm install'
             }
         }
-        stage('OWASP FS SCAN') {
+
+        stage('Build React App') {
             steps {
-                dependencyCheck additionalArguments: '--scan ./ --disableYarnAudit --disableNodeAudit', odcInstallation: 'DP-Check'
-                dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
+                sh 'npm run build'
             }
         }
-        stage('TRIVY FS SCAN') {
+
+        stage('Docker Build') {
             steps {
-                sh "trivy fs . > trivyfs.txt"
+                sh 'docker build -t $DOCKER_IMAGE:$TAG .'
             }
         }
-        stage("Docker Build & Push"){
-            steps{
-                script{
-                   withDockerRegistry(credentialsId: 'docker-creds', toolName: 'docker'){   
-                       sh "docker build -t swiggy ."
-                       sh "docker tag swiggy kastrov/swiggy:latest "
-                       sh "docker push kastrov/swiggy:latest "
-                    }
+
+        stage('Docker Push') {
+            steps {
+                withDockerRegistry(credentialsId: 'docker-creds', toolName: 'docker') {
+                    sh 'docker push $DOCKER_IMAGE:$TAG'
                 }
             }
         }
-        stage("TRIVY"){
-            steps{
-                sh "trivy image kastrov/swiggy:latest > trivy.txt" 
+
+        stage('Update K8s Manifest') {
+            steps {
+                sh '''
+                sed -i 's|image:.*|image: mamathaberragari/swiggy-app:latest|g' ArgoCD/deployment.yml
+                '''
             }
         }
-        stage('Deploy to container'){
-            steps{
-                sh 'docker run -d --name swiggy -p 3000:3000 kastrov/swiggy:latest'
+
+        stage('Push to GitHub') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'github-creds', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
+                    sh '''
+                    git config user.email "jenkins@gmail.com"
+                    git config user.name "jenkins"
+                    git add ArgoCD/deployment.yml
+                    git commit -m "Update image"
+                    git push https://$USER:$PASS@github.com/MamathaBerragari/DevOps-Project-Swiggy.git HEAD:main
+                    '''
+                }
             }
         }
     }
