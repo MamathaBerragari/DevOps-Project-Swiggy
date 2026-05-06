@@ -1,23 +1,14 @@
-# Using Node.js 16 as the base image
-FROM node:16
+FROM node:18 AS build
 
-# Setting up the working directory
 WORKDIR /app
-
-# Copying the package.json and package-lock.json files to the working directory
 COPY package*.json ./
-
-# Installation of npm dependency
 RUN npm install
 
-# Copy the application code
 COPY . .
-
-# Buildinf of the React app
 RUN npm run build
 
-# Expose port 3000 to access app
-EXPOSE 3000
+FROM nginx:alpine
+COPY --from=build /app/build /usr/share/nginx/html
 
-# Start your Node.js server
-CMD ["npm", "start"]
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
