@@ -184,7 +184,7 @@ function RestaurentOnline() {
                             <div style={{
                                 backgroundImage: `url(https://media-assets.swiggy.com/swiggy/image/upload/fl_lossy,f_auto,q_auto,w_660/xejp6fugbtzu08vpfqmu)`
                             }} className='Online-Card-img '>
-                                <div className='Online-color'><h4 className='fw-bolder' ></h4></div>
+                                <div className='Online-color'><h4 className='fw-bolder' >no offer</h4></div>
                             </div>
                             <h5 className='mt-3'>Aryaas</h5>
                             <i style={{ color: "#20963a" }} className="fa-solid fa-star"></i>4.4
